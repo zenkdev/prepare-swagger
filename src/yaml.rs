@@ -1,10 +1,37 @@
-use serde_yaml::Mapping;
+use indexmap::IndexMap;
+use serde::Deserialize;
+use serde_yaml::{Mapping, Value};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 
 use crate::swagger::Swagger;
 
-pub fn save_yaml(path: String, swagger: Swagger) {
+#[derive(Deserialize)]
+pub struct Config {
+    pub file: String,
+    pub url: String,
+    pub request: Option<RequestConfig>,
+    pub paths: Option<HashMap<String, Value>>,
+    pub definitions: Option<IndexMap<String, Value>>,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct RequestConfig {
+    pub headers: Option<HashMap<String, String>>,
+}
+
+pub fn read_config(path: String) -> Config {
+    let mut file = File::open(path).unwrap();
+    let mut contents = String::new();
+    file.read_to_string(&mut contents).unwrap();
+
+    let config: Config = serde_yaml::from_str(&contents).unwrap();
+
+    config
+}
+
+pub fn write_swagger(path: String, swagger: Swagger) {
     let mut map = Mapping::new();
     map.insert("swagger".into(), swagger.swagger.into());
 

@@ -1,7 +1,7 @@
 use indexmap::IndexMap;
 use std::collections::HashMap;
 
-use reqwest::header::{HeaderMap, HeaderValue};
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -16,7 +16,9 @@ pub struct Swagger {
     pub definitions: IndexMap<String, Definition>,
 }
 
-type Definition = IndexMap<String, Value>;
+pub type Paths = IndexMap<String, HashMap<String, Value>>;
+pub type Definitions = IndexMap<String, Definition>;
+pub type Definition = IndexMap<String, Value>;
 
 #[derive(Deserialize, Serialize)]
 pub struct Info {
@@ -29,16 +31,24 @@ pub struct Tag {
     pub description: String,
 }
 
-pub type Paths = IndexMap<String, HashMap<String, Value>>;
-
-pub fn get_swagger(url: String, multienv: String) -> Swagger {
-    let mut headers = HeaderMap::new();
-    headers.insert("x-sc-lb-hint", HeaderValue::from_str(&multienv).unwrap());
+pub fn get_swagger(url: String, headers: HashMap<String, String>) -> Swagger {
+    let mut header_map = HeaderMap::new();
+    for (key, val) in headers {
+        match (
+            HeaderName::from_bytes(key.as_bytes()),
+            HeaderValue::from_str(val.as_str()),
+        ) {
+            (Ok(name), Ok(value)) => {
+                header_map.insert(name, value);
+            }
+            _ => println!("Ошибка при преобразовании {}={}", key, val),
+        }
+    }
 
     let client = reqwest::blocking::Client::new();
     let body = client
         .get(url)
-        .headers(headers)
+        .headers(header_map)
         .send()
         .expect("request failed")
         .text()
