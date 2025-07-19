@@ -13,6 +13,7 @@ use std::collections::HashSet;
 use crate::merge_map::merge;
 use crate::swagger::get_swagger;
 use crate::swagger::{Definitions, Paths};
+use crate::yaml::PathsConfig;
 use crate::yaml::read_config;
 use crate::yaml::write_swagger;
 use crate::yaml::{Config, RequestConfig};
@@ -37,7 +38,7 @@ fn process_config(config: Config) {
 
     let mut paths = swagger.paths.clone();
     if let Some(mut config_paths) = config.paths {
-        let remove = config_paths.remove("__remove");
+        let remove = config_paths.shift_remove("__remove");
         rename_paths(&mut paths, config_paths);
         match remove {
             Some(paths_to_remove) => {
@@ -170,19 +171,19 @@ fn remove_paths(paths: &mut Paths, paths_to_remove: YamlValue) {
     }
 }
 
-fn rename_paths(paths: &mut Paths, paths_to_rename: HashMap<String, YamlValue>) {
-    let mut renamed: HashMap<String, String> = HashMap::new();
+fn rename_paths(paths: &mut Paths, paths_to_rename: PathsConfig) {
     for (search, value) in paths_to_rename {
         let re = Regex::new(&search).unwrap();
         let rep = value.as_str().unwrap();
-        let matched = paths.keys().filter(|k| re.is_match(k));
-        for key in matched {
-            renamed.insert(key.to_string(), re.replace(&key, rep).to_string());
-        }
-    }
-    for (from, to) in renamed {
-        if let Some(v) = paths.shift_remove(&from) {
-            paths.insert(to, v);
+        let rename: Vec<(String, String)> = paths
+            .keys()
+            .filter(|k| re.is_match(k))
+            .map(|k| (k.to_string(), re.replace(k, rep).to_string()))
+            .collect();
+        for (from, to) in rename {
+            if let Some(v) = paths.shift_remove(&from) {
+                paths.insert(to, v);
+            }
         }
     }
 }
@@ -425,5 +426,31 @@ mod tests {
 
         // Assert
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn it_rename_paths() {
+        // Arrange
+        let mut paths: Paths = serde_json::from_str(
+            r#"{
+"/logistics-flow-coordinator/v1/available-product-types": {},
+"/logistics-flow-coordinator/api/logistics/coordinator/v1/available-product-types": {}
+        }"#,
+        )
+        .unwrap();
+        let paths_to_rename: PathsConfig = serde_yaml::from_str(
+            r#"
+  "^/logistics-flow-coordinator/api/logistics/coordinator(/.*)": "$1"
+  "^/logistics-flow-coordinator(/.*)": "$1"
+        "#,
+        )
+        .unwrap();
+
+        // Act
+        rename_paths(&mut paths, paths_to_rename);
+        let keys: Vec<String> = paths.keys().cloned().collect();
+
+        // Assert
+        assert_eq!(keys, ["/v1/available-product-types".to_string()]);
     }
 }

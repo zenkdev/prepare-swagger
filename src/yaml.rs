@@ -12,7 +12,7 @@ pub struct Config {
     pub file: String,
     pub url: String,
     pub request: Option<RequestConfig>,
-    pub paths: Option<HashMap<String, Value>>,
+    pub paths: Option<PathsConfig>,
     pub definitions: Option<IndexMap<String, Value>>,
 }
 
@@ -20,6 +20,8 @@ pub struct Config {
 pub struct RequestConfig {
     pub headers: Option<HashMap<String, String>>,
 }
+
+pub type PathsConfig = IndexMap<String, Value>;
 
 pub fn read_config(path: String) -> Config {
     let mut file = File::open(path).unwrap();
