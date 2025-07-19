@@ -13,7 +13,7 @@ pub struct Swagger {
     pub base_path: String,
     pub tags: Vec<Tag>,
     pub paths: Paths,
-    pub definitions: IndexMap<String, Definition>,
+    pub definitions: Definitions,
 }
 
 pub type Paths = IndexMap<String, HashMap<String, Value>>;
@@ -25,7 +25,7 @@ pub struct Info {
     pub title: String,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct Tag {
     pub name: String,
     pub description: String,

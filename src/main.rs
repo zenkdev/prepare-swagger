@@ -37,13 +37,18 @@ fn process_config(config: Config) {
 
     let mut paths = swagger.paths.clone();
     if let Some(mut config_paths) = config.paths {
-        if let Some(paths_to_remove) = config_paths.remove("__remove") {
-            remove_paths(&mut paths, paths_to_remove);
-        }
+        let remove = config_paths.remove("__remove");
         rename_paths(&mut paths, config_paths);
+        match remove {
+            Some(paths_to_remove) => {
+                remove_paths(&mut paths, paths_to_remove);
+            }
+            None => {}
+        }
     }
     change_operation_id(&mut paths);
     remove_query_params(&mut paths);
+
     paths.sort_keys();
     swagger.paths = paths;
 
@@ -55,6 +60,9 @@ fn process_config(config: Config) {
         merge_definitions(&mut definitions, def);
     }
     update_required(&mut definitions);
+
+    remove_unused_definitions(&swagger.paths, &mut definitions);
+
     definitions.sort_keys();
     swagger.definitions = definitions;
 
@@ -63,6 +71,94 @@ fn process_config(config: Config) {
     swagger.tags.sort_by_key(|t| t.name.clone());
 
     write_swagger(config.file, swagger);
+}
+
+fn remove_unused_definitions(paths: &Paths, definitions: &mut Definitions) {
+    loop {
+        let defs = find_usages(&paths, &definitions);
+
+        let rm: Vec<String> = definitions
+            .keys()
+            .cloned()
+            .filter(|k| !defs.contains(k))
+            .collect();
+
+        if rm.is_empty() {
+            break;
+        }
+
+        for key in rm {
+            definitions.shift_remove(&key);
+        }
+    }
+}
+
+fn find_usages(paths: &Paths, definitions: &Definitions) -> Vec<String> {
+    let mut defs = Vec::new();
+
+    for methods in paths.values() {
+        for method in methods.values() {
+            let method_obj = method.as_object().unwrap();
+            let parameters = method_obj["parameters"].as_array().unwrap();
+            let responses = method_obj["responses"].as_object().unwrap();
+            for parameter in parameters {
+                let parameter_obj = parameter.as_object().unwrap();
+                if let Some(schema) = parameter_obj.get("schema") {
+                    if let Some(original_ref) = find_original_ref(schema) {
+                        insert_unique(&mut defs, original_ref);
+                    }
+                }
+            }
+            for response in responses.values() {
+                if let Some(schema) = response.get("schema") {
+                    if let Some(original_ref) = find_original_ref(schema) {
+                        insert_unique(&mut defs, original_ref);
+                    }
+                }
+            }
+        }
+    }
+
+    for dto in definitions.values() {
+        if let Some(properties) = dto.get("properties") {
+            for property in properties.as_object().unwrap().values() {
+                if let Some(original_ref) = find_original_ref(property) {
+                    insert_unique(&mut defs, original_ref);
+                }
+            }
+        }
+    }
+
+    defs.sort();
+    defs
+}
+
+fn find_original_ref(schema_or_property: &JsonValue) -> Option<String> {
+    if let Some(obj) = schema_or_property.as_object() {
+        if let Some(original_ref) = obj.get("originalRef") {
+            return Some(original_ref.as_str().unwrap().to_string());
+        }
+
+        match (obj.get("type"), obj.get("items")) {
+            (Some(obj_type), Some(obj_items)) => {
+                if obj_type.as_str().unwrap() == "array" {
+                    let items = obj_items.as_object().unwrap();
+                    if let Some(original_ref) = items.get("originalRef") {
+                        return Some(original_ref.as_str().unwrap().to_string());
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    None
+}
+
+fn insert_unique<T: PartialEq>(vec: &mut Vec<T>, item: T) {
+    if !vec.contains(&item) {
+        vec.push(item);
+    }
 }
 
 fn remove_paths(paths: &mut Paths, paths_to_remove: YamlValue) {
@@ -215,4 +311,119 @@ fn collect_tags(paths: &Paths) -> HashSet<String> {
         }
     }
     tags
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::swagger::Swagger;
+
+    #[test]
+    fn it_find_usages() {
+        // Arrange
+        let data = r#"{
+"swagger": "2.0",
+"info": {
+    "version": "1",
+    "title": "test-api"
+},
+"host": "",
+"basePath": "/",
+"tags": [],
+"paths": {
+    "/api": {
+        "get": {
+            "parameters": [
+                {
+                    "name": "query",
+                    "in": "query",
+                    "type": "string"
+                }
+            ],
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "schema": {
+                        "originalRef": "ResponseDto"
+                    }
+                }
+            }
+        },
+        "post": {
+            "parameters": [],
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "schema": {
+                        "type": "array",
+                        "items": {
+                            "originalRef": "ResponseItemDto"
+                        }
+                    }
+                }
+            }
+        },
+        "delete": {
+            "parameters": [
+                {
+                    "in": "body",
+                    "schema": {
+                        "originalRef": "ParametersDto"
+                    }
+                }
+            ],
+            "responses": {}
+        }
+    }
+},
+"definitions": {
+    "ResponseDto": {
+        "type": "object",
+        "required": [],
+        "properties": {
+            "status": {
+                "originalRef": "StatusDto"
+            },
+            "rows": {
+                "type": "array",
+                "items": {
+                    "originalRef": "ResponseRowDto"
+                }
+            }
+        },
+        "title": "ResponseDto"
+    },
+    "StatusDto": {
+        "type": "string"
+    },
+    "ResponseRowDto": {
+        "type": "object"
+    },
+    "ParametersDto": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+            "id": {
+                "type": "string"
+            }
+        },
+        "title": "ParametersDto"
+    }
+}
+        }"#;
+        let swagger: Swagger = serde_json::from_str(data).unwrap();
+        let expected = [
+            "ParametersDto",
+            "ResponseDto",
+            "ResponseItemDto",
+            "ResponseRowDto",
+            "StatusDto",
+        ];
+
+        // Act
+        let result = find_usages(&swagger.paths, &swagger.definitions);
+
+        // Assert
+        assert_eq!(result, expected);
+    }
 }
