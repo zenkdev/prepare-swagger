@@ -1,0 +1,14 @@
+{
+  "name": "prepare-swagger",
+  "version": "0.1.0",
+  "main": "main.js",
+  "bin": {
+    "prepare-swagger": "main.js"
+  },
+  "scripts": {
+    "postinstall": "node ./post-install.js",
+    "uninstall": "node ./uninstall.js"
+  },
+  "keywords": [],
+  "license": "ISC"
+}
