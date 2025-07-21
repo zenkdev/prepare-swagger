@@ -100,20 +100,24 @@ fn find_usages(paths: &Paths, definitions: &Definitions) -> Vec<String> {
     for methods in paths.values() {
         for method in methods.values() {
             let method_obj = method.as_object().unwrap();
-            let parameters = method_obj["parameters"].as_array().unwrap();
-            let responses = method_obj["responses"].as_object().unwrap();
-            for parameter in parameters {
-                let parameter_obj = parameter.as_object().unwrap();
-                if let Some(schema) = parameter_obj.get("schema") {
-                    if let Some(original_ref) = find_original_ref(schema) {
-                        insert_unique(&mut defs, original_ref);
+            if let Some(parameters) = method_obj.get("parameters") {
+                let parameters_obj = parameters.as_array().unwrap();
+                for parameter in parameters_obj {
+                    let parameter_obj = parameter.as_object().unwrap();
+                    if let Some(schema) = parameter_obj.get("schema") {
+                        if let Some(original_ref) = find_original_ref(schema) {
+                            insert_unique(&mut defs, original_ref);
+                        }
                     }
                 }
             }
-            for response in responses.values() {
-                if let Some(schema) = response.get("schema") {
-                    if let Some(original_ref) = find_original_ref(schema) {
-                        insert_unique(&mut defs, original_ref);
+            if let Some(responses) = method_obj.get("responses") {
+                let responses_obj = responses.as_object().unwrap();
+                for response in responses_obj.values() {
+                    if let Some(schema) = response.get("schema") {
+                        if let Some(original_ref) = find_original_ref(schema) {
+                            insert_unique(&mut defs, original_ref);
+                        }
                     }
                 }
             }
