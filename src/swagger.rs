@@ -16,7 +16,8 @@ pub struct Swagger {
     pub definitions: Definitions,
 }
 
-pub type Paths = IndexMap<String, HashMap<String, Value>>;
+pub type Paths = IndexMap<String, Path>;
+pub type Path = IndexMap<String, Value>;
 pub type Definitions = IndexMap<String, Definition>;
 pub type Definition = IndexMap<String, Value>;
 

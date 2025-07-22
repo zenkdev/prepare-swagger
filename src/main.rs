@@ -51,6 +51,7 @@ fn process_config(config: Config) {
     remove_query_params(&mut paths);
 
     paths.sort_keys();
+    paths.values_mut().for_each(|path| path.sort_keys());
     swagger.paths = paths;
 
     let mut definitions = swagger.definitions.clone();
@@ -65,6 +66,7 @@ fn process_config(config: Config) {
     remove_unused_definitions(&swagger.paths, &mut definitions);
 
     definitions.sort_keys();
+    definitions.values_mut().for_each(|def| def.sort_keys());
     swagger.definitions = definitions;
 
     let used_tags = collect_tags(&swagger.paths);
