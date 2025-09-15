@@ -146,16 +146,25 @@ fn find_original_ref(schema_or_property: &JsonValue) -> Option<String> {
             return Some(original_ref.as_str().unwrap().to_string());
         }
 
-        match (obj.get("type"), obj.get("items")) {
-            (Some(obj_type), Some(obj_items)) => {
-                if obj_type.as_str().unwrap() == "array" {
-                    let items = obj_items.as_object().unwrap();
-                    if let Some(original_ref) = items.get("originalRef") {
-                        return Some(original_ref.as_str().unwrap().to_string());
+        if let Some(obj_type) = obj.get("type") {
+            let str_type = obj_type.as_str().unwrap();
+            match str_type {
+                "array" => {
+                    if let Some(items) = obj.get("items") {
+                        if let Some(original_ref) = items.get("originalRef") {
+                            return Some(original_ref.as_str().unwrap().to_string());
+                        }
                     }
                 }
+                "object" => {
+                    if let Some(additional_properties) = obj.get("additionalProperties") {
+                        if let Some(original_ref) = additional_properties.get("originalRef") {
+                            return Some(original_ref.as_str().unwrap().to_string());
+                        }
+                    }
+                }
+                _ => {}
             }
-            _ => {}
         }
     }
 
@@ -396,6 +405,12 @@ mod tests {
                 "items": {
                     "originalRef": "ResponseRowDto"
                 }
+            },
+            "map": {
+                "type": "object",
+                "additionalProperties": {
+                    "originalRef": "MapItemDto"
+                }
             }
         },
         "title": "ResponseDto"
@@ -404,6 +419,9 @@ mod tests {
         "type": "string"
     },
     "ResponseRowDto": {
+        "type": "object"
+    },
+    "MapItemDto": {
         "type": "object"
     },
     "ParametersDto": {
@@ -420,6 +438,7 @@ mod tests {
         }"#;
         let swagger: Swagger = serde_json::from_str(data).unwrap();
         let expected = [
+            "MapItemDto",
             "ParametersDto",
             "ResponseDto",
             "ResponseItemDto",
