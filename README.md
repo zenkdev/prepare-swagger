@@ -1,9 +1,14 @@
 # prepare-swagger
 
+## usage
+
+```bash
+prepare-swagger path_to_config.yaml path_to_schema.yaml
+```
+
 ## schema
 
 ```yaml
-file: api.yaml
 url: https://petstore.swagger.io/v2/swagger.json
 request:
   # optional headers
@@ -21,7 +26,7 @@ definitions:
       id:
         type: string
     required:
-      - "*" # all properties
+      - '*' # all properties
   # definitions to override
   ModifyDto:
     properties:

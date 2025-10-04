@@ -1,35 +1,23 @@
 #!/usr/bin/env node
 
-const { exec } = require("child_process");
+const fs = require('fs')
+const { run } = require('./index')
 
-const controller =
-  typeof AbortController !== "undefined"
-    ? new AbortController()
-    : {
-        abort: () => {},
-        signal:
-          typeof AbortSignal !== "undefined" ? new AbortSignal() : undefined,
-      };
-const { signal } = controller;
+const input = process.argv[2]
+const output = process.argv[3]
 
-const command = ["prepare_swagger"]
-  .concat(...process.argv.splice(2))
-  .filter(Boolean)
-  .join(" ");
+if (!input || !output) {
+  console.error(`usage:
+prepare-swagger path_to_config.yaml path_to_schema.yaml`)
+  process.exit(1)
+}
 
-exec(command, { signal }, (error, stdout, stderr) => {
-  stdout && console.log(stdout);
-  stderr && console.error(stderr);
-  if (error !== null) {
-    console.log(`exec error: ${error}`);
-    process.exit(1);
-  }
-});
-
-process.on("SIGTERM", () => {
-  controller && controller.abort();
-});
-
-process.on("SIGINT", () => {
-  controller && controller.abort();
-});
+try {
+  const config = fs.readFileSync(input, 'utf8')
+  const schema = run(config)
+  fs.writeFileSync(output, schema, 'utf8')
+  process.exit(0)
+} catch (error) {
+  console.error(error)
+  process.exit(1)
+}
