@@ -825,7 +825,7 @@ dependencies = [
 
 [[package]]
 name = "prepare_swagger"
-version = "0.2.0-beta.1"
+version = "0.2.0"
 dependencies = [
  "convert_case",
  "indexmap",

@@ -8,7 +8,6 @@ env:
   push:
     branches:
       - main
-      - napi
     tags-ignore:
       - '**'
     paths-ignore:
